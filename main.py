@@ -464,7 +464,7 @@ def check_vfs_slots_api(mission_label, mission_code, token):
         )
         if r.status_code != 200:
             log.warning(f"  ↳ {mission_label}: Merkez listesi alınamadı (HTTP {r.status_code})")
-            if r.status_code == 401:
+            if r.status_code in (401, 403):
                 return "token_expired"
             return None
 
