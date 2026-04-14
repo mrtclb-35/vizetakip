@@ -465,7 +465,13 @@ def check_vfs_slots_api(mission_label, mission_code, token):
         if r.status_code != 200:
             log.warning(f"  ↳ {mission_label}: Merkez listesi alınamadı (HTTP {r.status_code})")
             if r.status_code in (401, 403):
-                return "token_expired"
+                # Token gerçekten dolmuş mu kontrol et (TTL aşıldıysa)
+                elapsed = time.time() - _vfs_token_time
+                if elapsed > TOKEN_TTL:
+                    return "token_expired"
+                # TTL dolmadıysa sadece bu ülkeyi atla (rate limit / IP engeli olabilir)
+                log.warning(f"  ↳ {mission_label}: 403 ama token geçerli — atlanıyor")
+                return None
             return None
 
         centers = r.json()
@@ -512,7 +518,11 @@ def check_vfs_slots_api(mission_label, mission_code, token):
                     )
                     if r3.status_code == 401:
                         return "token_expired"
-                    if r3.status_code != 200:
+                    if r3.status_code == 403:
+                        elapsed = time.time() - _vfs_token_time
+                        if elapsed > TOKEN_TTL:
+                            return "token_expired"
+                        continue
                         continue
 
                     data = r3.json()
