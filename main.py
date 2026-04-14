@@ -465,11 +465,12 @@ def check_vfs_slots_api(mission_label, mission_code, token):
         if r.status_code != 200:
             log.warning(f"  ↳ {mission_label}: Merkez listesi alınamadı (HTTP {r.status_code})")
             if r.status_code in (401, 403):
-                # Token gerçekten dolmuş mu kontrol et (TTL aşıldıysa)
-                elapsed = time.time() - _vfs_token_time
+                # Token gerçekten dolmuş mu kontrol et
+                current_token_time = _vfs_token_time  # anlık snapshot al
+                elapsed = time.time() - current_token_time if current_token_time > 0 else TOKEN_TTL + 1
+                log.warning(f"  ↳ {mission_label}: 403 — elapsed={int(elapsed)}s TTL={TOKEN_TTL}s token_time={int(current_token_time)}")
                 if elapsed > TOKEN_TTL:
                     return "token_expired"
-                # TTL dolmadıysa sadece bu ülkeyi atla (rate limit / IP engeli olabilir)
                 log.warning(f"  ↳ {mission_label}: 403 ama token geçerli — atlanıyor")
                 return None
             return None
