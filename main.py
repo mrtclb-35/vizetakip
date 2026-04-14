@@ -72,7 +72,7 @@ VFS_MISSIONS = [
 VFS_MISSION_NAMES = {m["mission"]: m["label"] for m in VFS_MISSIONS}
 
 # VFS token yönetimi
-TOKEN_FILE = "vfs_token.json"
+TOKEN_FILE = "/data/vfs_token.json"
 _vfs_token = None
 _vfs_token_time = 0
 TOKEN_TTL = 82800  # 23 saat (VFS token genellikle 24 saat geçerli)
