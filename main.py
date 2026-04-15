@@ -25,7 +25,6 @@ UPTIMEROBOT_API_KEY = os.getenv("UPTIMEROBOT_API_KEY", "")
 ALLOWED_USERS = {
     1512109776,  # Murat
     1380048184,  # Funda
-    1017566351,  # Funda Ev
     6320959975,  # Gamze Çelebi
 }
 
@@ -131,7 +130,7 @@ TARGET_SITE = "https://vizetakip.app/"
 VFS_MISSION_DICT = {m["label"]: m["mission"] for m in VFS_MISSIONS}
 
 TARGET_SITES = {
-    "iDATA": "https://randevu.idata.com.tr/",
+    "iDATA": "https://www.idata.com.tr/",
     "Kosmos Vize": "https://www.kosmosvize.com.tr/",
     **{m["label"]: f"https://visa.vfsglobal.com/tur/tr/{m['mission']}/interim" for m in VFS_MISSIONS},
     "AS Visa Ankara": "https://appointment.as-visa.com/tr/ankara-bireysel-basvuru",
@@ -465,15 +464,9 @@ def check_vfs_slots_api(mission_label, mission_code, token):
         )
         if r.status_code != 200:
             log.warning(f"  ↳ {mission_label}: Merkez listesi alınamadı (HTTP {r.status_code})")
-            if r.status_code in (401, 403):
-                # Token gerçekten dolmuş mu kontrol et
-                current_token_time = _vfs_token_time  # anlık snapshot al
-                elapsed = time.time() - current_token_time if current_token_time > 0 else TOKEN_TTL + 1
-                log.warning(f"  ↳ {mission_label}: 403 — elapsed={int(elapsed)}s TTL={TOKEN_TTL}s token_time={int(current_token_time)}")
-                if elapsed > TOKEN_TTL:
-                    return "token_expired"
-                log.warning(f"  ↳ {mission_label}: 403 ama token geçerli — atlanıyor")
-                return None
+            if r.status_code == 401:
+                return "token_expired"
+            # 403 = IP engeli (Railway IP'si bloklu) — token sorunu değil
             return None
 
         centers = r.json()
@@ -521,9 +514,8 @@ def check_vfs_slots_api(mission_label, mission_code, token):
                     if r3.status_code == 401:
                         return "token_expired"
                     if r3.status_code == 403:
-                        elapsed = time.time() - _vfs_token_time
-                        if elapsed > TOKEN_TTL:
-                            return "token_expired"
+                        continue  # IP engeli, token sorunu değil
+                    if r3.status_code != 200:
                         continue
 
                     data = r3.json()
@@ -660,7 +652,7 @@ def check_vizetakip():
     log.info("🎯 vizetakip.app kontrol ediliyor...")
     for attempt in range(3):
         try:
-            r, profile, engine = stealth_get(TARGET_SITE, max_retries=1)
+            r, profile, engine = stealth_get(TARGET_SITE, max_retries=2, use_proxy=True)
             if is_cloudflare_blocked(r.text.lower(), r.status_code):
                 _set_status("Vize Takip App", "🛡️ Cloudflare engeli")
                 return "blocked"
@@ -823,8 +815,10 @@ def run_full_scan(notify_chat_id=None):
         check_all_vfs_api()  # VFS API kontrolü
 
         with _state_lock:
+            import time as _t
+
             global last_check_time
-            last_check_time = time.strftime("%d.%m.%Y %H:%M:%S")
+            last_check_time = _t.strftime("%d.%m.%Y %H:%M:%S")
             statuses_copy = dict(site_statuses)
             error_count = sum(1 for s in statuses_copy.values() if "⚠️" in s)
             if error_count == len(statuses_copy):
