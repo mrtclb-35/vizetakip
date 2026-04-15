@@ -25,6 +25,7 @@ UPTIMEROBOT_API_KEY = os.getenv("UPTIMEROBOT_API_KEY", "")
 ALLOWED_USERS = {
     1512109776,  # Murat
     1380048184,  # Funda
+    1017566351,  # Funda Ev
     6320959975,  # Gamze Çelebi
 }
 
