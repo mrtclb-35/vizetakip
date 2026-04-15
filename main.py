@@ -130,7 +130,7 @@ TARGET_SITE = "https://vizetakip.app/"
 VFS_MISSION_DICT = {m["label"]: m["mission"] for m in VFS_MISSIONS}
 
 TARGET_SITES = {
-    "iDATA": "https://www.idata.com.tr/",
+    "iDATA": "https://randevu.idata.com.tr/",
     "Kosmos Vize": "https://www.kosmosvize.com.tr/",
     **{m["label"]: f"https://visa.vfsglobal.com/tur/tr/{m['mission']}/interim" for m in VFS_MISSIONS},
     "AS Visa Ankara": "https://appointment.as-visa.com/tr/ankara-bireysel-basvuru",
@@ -524,7 +524,6 @@ def check_vfs_slots_api(mission_label, mission_code, token):
                         if elapsed > TOKEN_TTL:
                             return "token_expired"
                         continue
-                        continue
 
                     data = r3.json()
                     earliest = data.get("earliestDate")
@@ -823,10 +822,8 @@ def run_full_scan(notify_chat_id=None):
         check_all_vfs_api()  # VFS API kontrolü
 
         with _state_lock:
-            import time as _t
-
             global last_check_time
-            last_check_time = _t.strftime("%d.%m.%Y %H:%M:%S")
+            last_check_time = time.strftime("%d.%m.%Y %H:%M:%S")
             statuses_copy = dict(site_statuses)
             error_count = sum(1 for s in statuses_copy.values() if "⚠️" in s)
             if error_count == len(statuses_copy):
@@ -1158,31 +1155,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-import cloudscraper
-
-def check_idata():
-    scraper = cloudscraper.create_scraper()
-    try:
-        print(f"[{time.strftime('%H:%M:%S')}] iDATA kontrol ediliyor...")
-        response = scraper.get("https://randevu.idata.com.tr/", timeout=30)
-        page = response.text.lower()
-        
-        negative = ["uygun randevu bulunmamaktadır", "no slots available", 
-                    "kapasite dolmuştur", "randevu bulunamadı"]
-        
-        if any(k in page for k in negative):
-            print("iDATA: Uygun randevu yok.")
-        elif len(page) > 500:
-            print("🚨 iDATA RANDEVU OLABİLİR!")
-            send_telegram_msg("🚨 iDATA RANDEVU OLABİLİR!\nhttps://randevu.idata.com.tr/")
-        else:
-            print("iDATA: Sayfa boş geldi.")
-    except Exception as e:
-        print(f"iDATA hata: {e}")
-def monitor_loop():
-    while True:
-        check_vfs()        # zaten var
-        check_as_visa()    # zaten var
-        check_idata()      # ← bunu ekle
-        time.sleep(CHECK_INTERVAL)
-        
