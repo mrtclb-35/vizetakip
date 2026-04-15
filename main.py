@@ -1158,3 +1158,31 @@ def main():
 
 if __name__ == "__main__":
     main()
+import cloudscraper
+
+def check_idata():
+    scraper = cloudscraper.create_scraper()
+    try:
+        print(f"[{time.strftime('%H:%M:%S')}] iDATA kontrol ediliyor...")
+        response = scraper.get("https://randevu.idata.com.tr/", timeout=30)
+        page = response.text.lower()
+        
+        negative = ["uygun randevu bulunmamaktadır", "no slots available", 
+                    "kapasite dolmuştur", "randevu bulunamadı"]
+        
+        if any(k in page for k in negative):
+            print("iDATA: Uygun randevu yok.")
+        elif len(page) > 500:
+            print("🚨 iDATA RANDEVU OLABİLİR!")
+            send_telegram_msg("🚨 iDATA RANDEVU OLABİLİR!\nhttps://randevu.idata.com.tr/")
+        else:
+            print("iDATA: Sayfa boş geldi.")
+    except Exception as e:
+        print(f"iDATA hata: {e}")
+def monitor_loop():
+    while True:
+        check_vfs()        # zaten var
+        check_as_visa()    # zaten var
+        check_idata()      # ← bunu ekle
+        time.sleep(CHECK_INTERVAL)
+        
