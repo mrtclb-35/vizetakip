@@ -29,10 +29,10 @@ ALLOWED_USERS = {
 }
 
 WEBSHARE_URL = os.getenv("WEBSHARE_URL", "")
-PROXY_USER = os.getenv("PROXY_USER", "imzlizkcstaticresidential")
+PROXY_USER = os.getenv("PROXY_USER", "imzlizkc")
 PROXY_PASS = os.getenv("PROXY_PASS", "fiatpux73kpt")
 
-STATIC_PROXY_HOSTS = os.getenv("PROXY_HOST", "138.226.71.48:7238").split(",")
+STATIC_PROXY_HOSTS = os.getenv("PROXY_HOST", "137.59.7.66:5610").split(",")
 
 # ─── VFS API ──────────────────────────────────────────────────────────────────
 VFS_EMAIL    = os.getenv("VFS_EMAIL", "enodiaturizm@gmail.com")
