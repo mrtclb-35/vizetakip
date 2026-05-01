@@ -646,7 +646,7 @@ def check_vizetakip():
     log.info("🎯 vizetakip.app kontrol ediliyor...")
     for attempt in range(3):
         try:
-            r, profile, engine = stealth_get(TARGET_SITE, max_retries=2, use_proxy=True)
+            r, profile, engine = stealth_get(TARGET_SITE, max_retries=2, use_proxy=False)
             if is_cloudflare_blocked(r.text.lower(), r.status_code):
                 _set_status("Vize Takip App", "🛡️ Cloudflare engeli")
                 return "blocked"
