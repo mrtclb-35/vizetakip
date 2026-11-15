@@ -1,0 +1,8 @@
+.pythonlibs/
+__pycache__/
+*.py[cod]
+.data/
+*.log
+vt_hashes.json
+.env
+.env.*

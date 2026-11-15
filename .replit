@@ -5,3 +5,31 @@ channel = "stable-25_05"
 
 [agent]
 expertMode = true
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Visa tracking bot"
+
+[[workflows.workflow]]
+name = "Visa tracking bot"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -u main.py"
+waitForPort = 8080
+
+[workflows.workflow.metadata]
+outputType = "console"

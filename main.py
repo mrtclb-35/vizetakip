@@ -10,32 +10,31 @@ Hedef Odaklı Vize Takip Botu — Stealth v7
 import os, time, random, logging, threading, requests, hashlib, json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from pathlib import Path
 from bs4 import BeautifulSoup
 import cloudscraper
 from curl_cffi import requests as cffi_requests
 
 # ─── AYARLAR ─────────────────────────────────────────────────────────────────
-TELEGRAM_TOKEN = os.getenv(
-    "TELEGRAM_TOKEN", "8385629830:AAEgXC9rl48rbW29-NpVaqj2QUOB0PTHV4U"
-)
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1512109776")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "").strip()
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "1200"))
 UPTIMEROBOT_API_KEY = os.getenv("UPTIMEROBOT_API_KEY", "")
 
 ALLOWED_USERS = {
-    1512109776,  # Murat
-    1380048184,  # Funda
-    6320959975,  # Gamze Çelebi
+    int(uid.strip())
+    for uid in os.getenv("TELEGRAM_ALLOWED_USERS", CHAT_ID).split(",")
+    if uid.strip()
 }
 
 WEBSHARE_URL = os.getenv("WEBSHARE_URL", "")
-PROXY_USER = os.getenv("PROXY_USER", "imzlizkcstaticresidential")
-PROXY_PASS = os.getenv("PROXY_PASS", "fiatpux73kpt")
+PROXY_USER = os.getenv("PROXY_USER", "")
+PROXY_PASS = os.getenv("PROXY_PASS", "")
 
-STATIC_PROXY_HOSTS = os.getenv("PROXY_HOST", "138.226.71.48:7238").split(",")
+STATIC_PROXY_HOSTS = [h.strip() for h in os.getenv("PROXY_HOST", "").split(",") if h.strip()]
 
 # ─── VFS API ──────────────────────────────────────────────────────────────────
-VFS_EMAIL    = os.getenv("VFS_EMAIL", "enodiaturizm@gmail.com")
+VFS_EMAIL    = os.getenv("VFS_EMAIL", "")
 VFS_PASSWORD = os.getenv("VFS_PASSWORD", "")
 LIFT_API     = "https://lift-api.vfsglobal.com"
 
@@ -66,7 +65,8 @@ VFS_MISSIONS = [
 VFS_MISSION_NAMES = {m["mission"]: m["label"] for m in VFS_MISSIONS}
 
 # VFS token yönetimi
-TOKEN_FILE = "/data/vfs_token.json"
+DATA_DIR = Path(os.getenv("DATA_DIR", str(Path(__file__).resolve().parent / ".data")))
+TOKEN_FILE = DATA_DIR / "vfs_token.json"
 _vfs_token = None
 _vfs_token_time = 0
 TOKEN_TTL = 82800  # 23 saat (VFS token genellikle 24 saat geçerli)
@@ -92,6 +92,8 @@ def build_proxy_pool():
 
 
 def validate_proxy_pool(pool):
+    if not pool:
+        return []
     def test(px):
         try:
             s = cffi_requests.Session(impersonate="chrome131")
@@ -107,11 +109,13 @@ def validate_proxy_pool(pool):
     return [px for px in results if px]
 
 
-_raw_pool = build_proxy_pool()
-PROXY_POOL = validate_proxy_pool(_raw_pool) or _raw_pool
+_raw_pool = []
+PROXY_POOL = []
 
 
 def get_random_proxy():
+    if not PROXY_POOL:
+        return None
     return {"http": (px := random.choice(PROXY_POOL)), "https": px}
 
 
@@ -213,7 +217,7 @@ last_check_time = None
 consecutive_errors = 0
 
 _vt_section_hashes = {"yeni": None, "gecmis": None}
-HASH_FILE = "vt_hashes.json"
+HASH_FILE = DATA_DIR / "vt_hashes.json"
 
 
 def _save_hashes():
@@ -267,8 +271,8 @@ def send_telegram(chat_id, message):
         )
         r.raise_for_status()
         return True
-    except requests.RequestException as e:
-        log.warning(f"Telegram gönderilemedi: {e}")
+    except requests.RequestException:
+        log.warning("Telegram gönderilemedi; bağlantıyı ve bot ayarlarını kontrol edin.")
         return False
 
 
@@ -848,6 +852,8 @@ def run_full_scan(notify_chat_id=None):
 
 # ─── Telegram komutları ──────────────────────────────────────────────────────
 def handle_command(chat_id, text):
+    if chat_id not in ALLOWED_USERS:
+        return
     cmd = text.strip().split()[0].lower()
     parts = text.strip().split(maxsplit=1)
 
@@ -1034,12 +1040,12 @@ def poll_telegram():
                     chat_id = msg.get("chat", {}).get("id")
                     text = msg.get("text", "")
                     if chat_id and text.startswith("/"):
-                        log.info(f"Komut alındı ({chat_id}): {text[:50]}")
+                        log.info("Telegram komutu alındı.")
                         threading.Thread(
                             target=handle_command, args=(chat_id, text), daemon=True
                         ).start()
-        except Exception as e:
-            log.warning(f"Polling hatası: {e}")
+        except Exception:
+            log.warning("Telegram polling hatası; bağlantıyı ve bot ayarlarını kontrol edin.")
             time.sleep(5)
 
 
@@ -1099,7 +1105,7 @@ def vizetakip_loop():
         check_vizetakip()
 
 
-KEEP_ALIVE_URL = "https://vizetakip.mrtclb.workers.dev/"
+KEEP_ALIVE_URL = os.getenv("KEEP_ALIVE_URL", "")
 
 def keep_alive_loop():
     """Cloudflare Workers üzerinden botu uyanık tut."""
@@ -1113,6 +1119,16 @@ def keep_alive_loop():
 
 
 def main():
+    global _raw_pool, PROXY_POOL
+    if not TELEGRAM_TOKEN or not CHAT_ID or not ALLOWED_USERS:
+        raise SystemExit(
+            "Set TELEGRAM_TOKEN and TELEGRAM_CHAT_ID in Replit Secrets before starting."
+        )
+    DATA_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _raw_pool = build_proxy_pool()
+    PROXY_POOL = validate_proxy_pool(_raw_pool) or _raw_pool
+    if not PROXY_POOL:
+        log.warning("Proxy ayarlanmadı; doğrudan bağlantı kullanılacak, bazı siteler engelleyebilir.")
     log.info(
         f"🎯 Vize Takip Botu Başlatıldı! (v7 — {len(PROXY_POOL)}/{len(_raw_pool)} proxy)"
     )
@@ -1140,8 +1156,9 @@ def main():
     threading.Thread(target=monitor_loop, daemon=True).start()
     threading.Thread(target=vizetakip_loop, daemon=True).start()
     threading.Thread(target=token_watch_loop, daemon=True).start()
-    threading.Thread(target=keep_alive_loop, daemon=True).start()
-    log.info("♻️ Keep-alive aktif (Cloudflare Workers)")
+    if KEEP_ALIVE_URL:
+        threading.Thread(target=keep_alive_loop, daemon=True).start()
+        log.info("Keep-alive aktif.")
     poll_telegram()
 
 
